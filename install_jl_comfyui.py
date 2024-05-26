@@ -14,7 +14,24 @@ def select_archive():
     archive_entry.delete(0, tk.END)
     archive_entry.insert(0, archive_path)
 
+def update_progress(step):
+    progress_bar['value'] = (step / total_steps) * 100
+    window.update_idletasks()
+
+def run_command(command, message):
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+    for line in process.stdout:
+        log_text.insert(tk.END, line)
+        log_text.see(tk.END)
+        window.update_idletasks()
+    return_code = process.wait()
+    if return_code != 0:
+        log_text.insert(tk.END, f"Ошибка при выполнении команды: {message}\n")
+    else:
+        log_text.insert(tk.END, f"{message} завершено.\n")
+
 def install():
+    global current_step, total_steps
     archive_path = archive_entry.get()
     install_path = install_entry.get()
 
@@ -23,45 +40,53 @@ def install():
         return
 
     install_button.config(state=tk.DISABLED)
-    progress_bar.start()
+    log_text.delete('1.0', tk.END)
+    progress_bar['value'] = 0
+    total_steps = 5
+    current_step = 0
 
     log_text.insert(tk.END, "Начинаем установку ComfyUI...\n")
 
     # Проверка наличия WinRAR и установка при необходимости
+    current_step += 1
+    update_progress(current_step)
     try:
         subprocess.call(["winrar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
         log_text.insert(tk.END, "WinRAR не найден. Устанавливаем WinRAR...\n")
         winrar_path = resource_path("WinRAR.v5.01.exe")
-        subprocess.call([winrar_path, "/S"])
-        log_text.insert(tk.END, "WinRAR установлен.\n")
+        run_command([winrar_path, "/S"], "Установка WinRAR")
 
     # Проверка наличия Python и установка при необходимости
+    current_step += 1
+    update_progress(current_step)
     try:
         subprocess.call(["python", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
         log_text.insert(tk.END, "Python не найден. Устанавливаем Python...\n")
         python_path = resource_path("python-3.10.6-amd64.exe")
-        subprocess.call([python_path, "/quiet", "InstallAllUsers=1", "PrependPath=1"])
-        log_text.insert(tk.END, "Python установлен.\n")
+        run_command([python_path, "/quiet", "InstallAllUsers=1", "PrependPath=1"], "Установка Python")
 
     # Распаковка архива
+    current_step += 1
+    update_progress(current_step)
     log_text.insert(tk.END, "Распаковка архива...\n")
-    subprocess.call(["winrar", "x", archive_path, install_path])
-    log_text.insert(tk.END, "Архив распакован.\n")
+    run_command(["winrar", "x", archive_path, install_path], "Распаковка архива")
 
     # Добавление путей в системную переменную PATH
+    current_step += 1
+    update_progress(current_step)
     python_path = os.path.join(install_path, "python")
     ffmpeg_path = os.path.join(install_path, "ffmpeg", "bin")
     os.environ["PATH"] += f";{python_path};{python_path}\\Scripts;{ffmpeg_path}"
 
     # Обновление ComfyUI
+    current_step += 1
+    update_progress(current_step)
     log_text.insert(tk.END, "Обновление ComfyUI...\n")
     update_path = os.path.join(install_path, "update")
-    subprocess.call(["update_comfyui.bat"], cwd=update_path, shell=True)
-    log_text.insert(tk.END, "Обновление ComfyUI завершено.\n")
+    run_command(["update_comfyui.bat"], "Обновление ComfyUI")
 
-    progress_bar.stop()
     install_button.config(state=tk.NORMAL)
     messagebox.showinfo("Успех", "Установка ComfyUI завершена успешно!")
 
@@ -91,10 +116,13 @@ install_entry.grid(row=1, column=1, padx=(5, 0))
 install_button = ttk.Button(frame, text="Установить", command=install)
 install_button.grid(row=2, column=1, pady=(10, 0))
 
-progress_bar = ttk.Progressbar(frame, mode='indeterminate')
-progress_bar.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+progress_bar = ttk.Progressbar(frame, mode='determinate', length=300)
+progress_bar.grid(row=3, column=0, columnspan=3, pady=(10, 0))
 
 log_text = tk.Text(frame, height=10, width=60)
 log_text.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+
+total_steps = 0
+current_step = 0
 
 window.mainloop()
