@@ -27,6 +27,9 @@ def run_command(command, message):
     return_code = process.wait()
     if return_code != 0:
         log_text.insert(tk.END, f"Ошибка при выполнении команды: {message}\n")
+        messagebox.showerror("Ошибка", f"Не удалось выполнить: {message}")
+        install_button.config(state=tk.NORMAL)
+        raise Exception(f"Ошибка при выполнении команды: {message}")
     else:
         log_text.insert(tk.END, f"{message} завершено.\n")
 
@@ -47,48 +50,53 @@ def install():
 
     log_text.insert(tk.END, "Начинаем установку ComfyUI...\n")
 
-    # Проверка наличия WinRAR и установка при необходимости
-    current_step += 1
-    update_progress(current_step)
     try:
-        subprocess.call(["winrar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        log_text.insert(tk.END, "WinRAR не найден. Устанавливаем WinRAR...\n")
-        winrar_path = resource_path("WinRAR.v5.01.exe")
-        run_command([winrar_path, "/S"], "Установка WinRAR")
+        # Проверка наличия WinRAR и установка при необходимости
+        current_step += 1
+        update_progress(current_step)
+        try:
+            subprocess.call(["C:\\Program Files\\WinRAR\\winrar.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            log_text.insert(tk.END, "WinRAR не найден. Устанавливаем WinRAR...\n")
+            winrar_path = resource_path("WinRAR.v5.01.exe")
+            run_command([winrar_path, "/S"], "Установка WinRAR")
 
-    # Проверка наличия Python и установка при необходимости
-    current_step += 1
-    update_progress(current_step)
-    try:
-        subprocess.call(["python", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        log_text.insert(tk.END, "Python не найден. Устанавливаем Python...\n")
-        python_path = resource_path("python-3.10.6-amd64.exe")
-        run_command([python_path, "/quiet", "InstallAllUsers=1", "PrependPath=1"], "Установка Python")
+        # Проверка наличия Python и установка при необходимости
+        current_step += 1
+        update_progress(current_step)
+        try:
+            subprocess.call(["python", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            log_text.insert(tk.END, "Python не найден. Устанавливаем Python...\n")
+            python_path = resource_path("python-3.10.6-amd64.exe")
+            run_command([python_path, "/quiet", "InstallAllUsers=1", "PrependPath=1"], "Установка Python")
 
-    # Распаковка архива
-    current_step += 1
-    update_progress(current_step)
-    log_text.insert(tk.END, "Распаковка архива...\n")
-    run_command(["winrar", "x", archive_path, install_path], "Распаковка архива")
+        # Распаковка архива
+        current_step += 1
+        update_progress(current_step)
+        log_text.insert(tk.END, "Распаковка архива...\n")
+        run_command(["C:\\Program Files\\WinRAR\\winrar.exe", "x", archive_path, install_path], "Распаковка архива")
 
-    # Добавление путей в системную переменную PATH
-    current_step += 1
-    update_progress(current_step)
-    python_path = os.path.join(install_path, "python")
-    ffmpeg_path = os.path.join(install_path, "ffmpeg", "bin")
-    os.environ["PATH"] += f";{python_path};{python_path}\\Scripts;{ffmpeg_path}"
+        # Добавление путей в системную переменную PATH
+        current_step += 1
+        update_progress(current_step)
+        python_path = os.path.join(install_path, "python")
+        ffmpeg_path = os.path.join(install_path, "ffmpeg", "bin")
+        os.environ["PATH"] += f";{python_path};{python_path}\\Scripts;{ffmpeg_path}"
 
-    # Обновление ComfyUI
-    current_step += 1
-    update_progress(current_step)
-    log_text.insert(tk.END, "Обновление ComfyUI...\n")
-    update_path = os.path.join(install_path, "update")
-    run_command(["update_comfyui.bat"], "Обновление ComfyUI")
+        # Обновление ComfyUI
+        current_step += 1
+        update_progress(current_step)
+        log_text.insert(tk.END, "Обновление ComfyUI...\n")
+        update_path = os.path.join(install_path, "update")
+        run_command(["update_comfyui.bat"], "Обновление ComfyUI")
 
-    install_button.config(state=tk.NORMAL)
-    messagebox.showinfo("Успех", "Установка ComfyUI завершена успешно!")
+        install_button.config(state=tk.NORMAL)
+        messagebox.showinfo("Успех", "Установка ComfyUI завершена успешно!")
+    except Exception as e:
+        log_text.insert(tk.END, f"Ошибка при установке ComfyUI: {str(e)}\n")
+        messagebox.showerror("Ошибка", f"Не удалось установить ComfyUI. Ошибка: {str(e)}")
+        install_button.config(state=tk.NORMAL)
 
 # Создание графического интерфейса
 window = tk.Tk()
