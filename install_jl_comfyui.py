@@ -14,32 +14,38 @@ def select_archive():
     archive_entry.delete(0, tk.END)
     archive_entry.insert(0, archive_path)
 
-def update_progress(step):
+def update_progress(step, total_steps):
     progress_bar['value'] = (step / total_steps) * 100
+    progress_label.config(text=f"Прогресс: {int(progress_bar['value'])}%")
     window.update_idletasks()
 
 def run_command(command, message):
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     for line in process.stdout:
         log_text.insert(tk.END, line)
         log_text.see(tk.END)
         window.update_idletasks()
     return_code = process.wait()
     if return_code != 0:
+        error_output = process.stderr.read()
         log_text.insert(tk.END, f"Ошибка при выполнении команды: {message}\n")
-        messagebox.showerror("Ошибка", f"Не удалось выполнить: {message}")
+        log_text.insert(tk.END, f"Вывод ошибки: {error_output}\n")
+        messagebox.showerror("Ошибка", f"Не удалось выполнить: {message}\nВывод ошибки: {error_output}")
         install_button.config(state=tk.NORMAL)
         raise Exception(f"Ошибка при выполнении команды: {message}")
     else:
         log_text.insert(tk.END, f"{message} завершено.\n")
 
 def install():
-    global current_step, total_steps
     archive_path = archive_entry.get()
     install_path = install_entry.get()
 
     if not archive_path or not install_path:
         messagebox.showerror("Ошибка", "Пожалуйста, укажите путь к архиву и путь установки.")
+        return
+
+    if not os.path.isfile(archive_path):
+        messagebox.showerror("Ошибка", f"Указанный архив не существует: {archive_path}")
         return
 
     install_button.config(state=tk.DISABLED)
@@ -53,7 +59,7 @@ def install():
     try:
         # Проверка наличия WinRAR и установка при необходимости
         current_step += 1
-        update_progress(current_step)
+        update_progress(current_step, total_steps)
         try:
             subprocess.call(["C:\\Program Files\\WinRAR\\winrar.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
@@ -63,9 +69,9 @@ def install():
 
         # Проверка наличия Python и установка при необходимости
         current_step += 1
-        update_progress(current_step)
+        update_progress(current_step, total_steps)
         try:
-            subprocess.call(["python", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(["C:\\Program Files\\Python310\\python.exe", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
             log_text.insert(tk.END, "Python не найден. Устанавливаем Python...\n")
             python_path = resource_path("python-3.10.6-amd64.exe")
@@ -73,20 +79,20 @@ def install():
 
         # Распаковка архива
         current_step += 1
-        update_progress(current_step)
+        update_progress(current_step, total_steps)
         log_text.insert(tk.END, "Распаковка архива...\n")
         run_command(["C:\\Program Files\\WinRAR\\winrar.exe", "x", archive_path, install_path], "Распаковка архива")
 
         # Добавление путей в системную переменную PATH
         current_step += 1
-        update_progress(current_step)
+        update_progress(current_step, total_steps)
         python_path = os.path.join(install_path, "python")
         ffmpeg_path = os.path.join(install_path, "ffmpeg", "bin")
         os.environ["PATH"] += f";{python_path};{python_path}\\Scripts;{ffmpeg_path}"
 
         # Обновление ComfyUI
         current_step += 1
-        update_progress(current_step)
+        update_progress(current_step, total_steps)
         log_text.insert(tk.END, "Обновление ComfyUI...\n")
         update_path = os.path.join(install_path, "update")
         run_command(["update_comfyui.bat"], "Обновление ComfyUI")
@@ -127,10 +133,10 @@ install_button.grid(row=2, column=1, pady=(10, 0))
 progress_bar = ttk.Progressbar(frame, mode='determinate', length=300)
 progress_bar.grid(row=3, column=0, columnspan=3, pady=(10, 0))
 
-log_text = tk.Text(frame, height=10, width=60)
-log_text.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+progress_label = ttk.Label(frame, text="Прогресс: 0%")
+progress_label.grid(row=4, column=0, columnspan=3)
 
-total_steps = 0
-current_step = 0
+log_text = tk.Text(frame, height=10, width=60)
+log_text.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
 
 window.mainloop()
